@@ -1,0 +1,111 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFrameworks>net10.0-android</TargetFrameworks>
+		<TargetFrameworks Condition="!$([MSBuild]::IsOSPlatform('linux'))">$(TargetFrameworks);net10.0-ios;net10.0-maccatalyst</TargetFrameworks>
+		<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net10.0-windows10.0.19041.0</TargetFrameworks>
+
+		<!-- Note for MacCatalyst:
+		The default runtime is maccatalyst-x64, except in Release config, in which case the default is maccatalyst-x64;maccatalyst-arm64.
+		When specifying both architectures, use the plural <RuntimeIdentifiers> instead of the singular <RuntimeIdentifier>.
+		The Mac App Store will NOT accept apps with ONLY maccatalyst-arm64 indicated;
+		either BOTH runtimes must be indicated or ONLY macatalyst-x64. -->
+		<!-- For example: <RuntimeIdentifiers>maccatalyst-x64;maccatalyst-arm64</RuntimeIdentifiers> -->
+
+		<OutputType>Exe</OutputType>
+		<RootNamespace>BA</RootNamespace>
+		<UseMaui>true</UseMaui>
+		<SingleProject>true</SingleProject>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+
+		<!-- Enable XAML source generation for faster build times and improved performance.
+		     This generates C# code from XAML at compile time instead of runtime inflation.
+		     To disable, remove this line.
+		     For individual files, you can override by setting Inflator metadata:
+		       <MauiXaml Update="MyPage.xaml" Inflator="Default" /> (reverts to defaults: Runtime for Debug, XamlC for Release)
+		       <MauiXaml Update="MyPage.xaml" Inflator="Runtime" /> (force runtime inflation) -->
+		<MauiXamlInflator>SourceGen</MauiXamlInflator>
+
+		<!-- Display name -->
+		<ApplicationTitle>BA</ApplicationTitle>
+
+		<!-- App Identifier -->
+		<ApplicationId>com.companyname.ba</ApplicationId>
+
+		<!-- Versions -->
+		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+		<ApplicationVersion>1</ApplicationVersion>
+
+		<!-- To develop, package, and publish an app to the Microsoft Store, see: https://aka.ms/MauiTemplateUnpackaged -->
+		<WindowsPackageType>None</WindowsPackageType>
+
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">15.0</SupportedOSPlatformVersion>
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
+		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<!-- App Icon -->
+		<MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#512BD4" />
+
+		<!-- Splash Screen -->
+		<MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#512BD4" BaseSize="128,128" />
+
+		<!-- Images -->
+		<MauiImage Include="Resources\Images\*" />
+		<MauiImage Update="Resources\Images\dotnet_bot.png" Resize="True" BaseSize="300,185" />
+		
+		<!-- Custom Fonts -->
+		<MauiFont Include="Resources\Fonts\*" />
+
+		<!-- Raw Assets (also remove the "Resources\Raw" prefix) -->
+		<MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="CommunityToolkit.Maui" Version="13.0.0" />
+		<PackageReference Include="CommunityToolkit.Maui.Markup" Version="7.0.0" />
+		<PackageReference Include="CommunityToolkit.Maui.MediaElement" Version="7.0.0" />
+		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+		<PackageReference Include="FFMpegCore" Version="5.4.0" />
+		<PackageReference Include="LibVLCSharp.MAUI" Version="3.10.0" />
+		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
+		<PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.23" />
+	</ItemGroup>
+
+	<!-- SrtSharp (libsrt-Bindings) nur für Windows: native DLL existiert nur für win-x64/linux-x64,
+	     nicht für Android/iOS/maccatalyst. Auf den mobilen TFMs würde das Paket sonst zur Laufzeit
+	     mit DllNotFoundException brechen. -->
+	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
+		<!-- GeneratePathProperty erzeugt $(PkgSrtSharp) mit dem Paket-Wurzelpfad. -->
+		<PackageReference Include="SrtSharp" Version="1.5.1.10027" GeneratePathProperty="true" />
+		<!-- SIPSorcery: reines C#-WebRTC (SDP/ICE/DTLS/SRTP). Für die native WebRTC-Latenzmessung (kein
+		     Browser/WHIP-Server nötig): zwei App-Instanzen bauen eine PeerConnection über den Rückkanal auf. -->
+		<PackageReference Include="SIPSorcery" Version="10.0.16" />
+	</ItemGroup>
+
+	<!-- Referenz-Testvideos (im Git versioniert) neben die App kopieren, damit die empfangsseitige
+	     Qualitätsmessung die Referenz automatisch per Dateiname unter <App>/TestVideos/ findet – ohne
+	     manuelle Pfadangabe und auf beiden (per Git synchronen) PCs identisch. Nur Windows (Qualitäts-
+	     feature ist Windows-only; verhindert APK-/Bundle-Bloat auf den mobilen TFMs). -->
+	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
+		<None Update="TestVideos\**" CopyToOutputDirectory="PreserveNewest" />
+	</ItemGroup>
+
+	<!-- Native libsrt-DLL ins Output kopieren. Nötig, weil sie im Paket unter native/RELEASE/ liegt
+	     (die automatische SDK-Native-Auflösung greift nur direkt unter native/), und weil das
+	     paket-eigene Copy-Target an win-$(PlatformTarget) hängt (bei MAUI oft AnyCPU → kein Treffer).
+	     Über ein None-Item mit CopyToOutputDirectory landet sie zuverlässig neben der .exe – RID-unabhängig
+	     und auch beim Publish. Zur Laufzeit zusätzlich nötig: VC++ 2015-2022 Redistributable (x64). -->
+	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
+		<None Include="$(PkgSrtSharp)\runtimes\win-x64\native\release\srt_swig_csharp.dll"
+		      Link="srt_swig_csharp.dll"
+		      CopyToOutputDirectory="PreserveNewest"
+		      Visible="false" />
+	</ItemGroup>
+
+</Project>
